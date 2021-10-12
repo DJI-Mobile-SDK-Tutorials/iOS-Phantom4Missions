@@ -11,7 +11,7 @@
 #import "DemoUtility.h"
 #import "DJIScrollView.h"
 
-@interface ActiveTrackViewController () <DJIVideoFeedListener, TrackingRenderViewDelegate>
+@interface ActiveTrackViewController () <DJIVideoFeedListener, TrackingRenderViewDelegate, DJIVideoPreviewerFrameControlDelegate>
 
 @property (weak, nonatomic) IBOutlet UIView *fpvView;
 @property (weak, nonatomic) IBOutlet TrackingRenderView *renderView;
@@ -42,12 +42,23 @@
     [[DJIVideoPreviewer instance] setView:self.fpvView];
     [[DJISDKManager videoFeeder].primaryVideoFeed addListener:self withQueue:nil];
     [[DJIVideoPreviewer instance] start];
+    [DJIVideoPreviewer instance].frameControlHandler = self;
 
     [[self missionOperator] setRecommendedConfigurationWithCompletion:^(NSError * _Nullable error) {
         if(error){
             ShowResult(@"Set Recommended recommended camera and gimbal configuration: %@", error.localizedDescription);
         }
     }];
+    
+    DJICamera* camera = [DemoUtility fetchCamera];
+    if (camera.displayName == DJICameraDisplayNameMavic2ZoomCamera ||
+        camera.displayName == DJICameraDisplayNameMavic2ProCamera) {
+        [[self missionOperator] enableAutoSensingWithCompletion:^(NSError * _Nullable error) {
+            if (error) {
+                ShowResult(@"Start Auto Sensing Failed:%@", error.localizedDescription);
+            }
+        }];
+    }
     
     [self updateButtons];
     [self updateGestureEnabled];
@@ -296,6 +307,17 @@
 }
 
 - (IBAction)onRejectButtonClicked:(id)sender {
+    
+    DJICamera* camera = [DemoUtility fetchCamera];
+    if (camera.displayName == DJICameraDisplayNameMavic2ZoomCamera ||
+        camera.displayName == DJICameraDisplayNameMavic2ProCamera) {
+        [[self missionOperator] rejectConfirmationWithCompletion:^(NSError *_Nullable error) {
+          if (error) {
+              ShowResult(@"Reject Confirmation Failed: %@", error.description);
+          }
+        }];
+        return;
+    }
    
     [[self missionOperator] stopAircraftFollowingWithCompletion:^(NSError * _Nullable error) {
             ShowResult(@"Stop Aircraft Following Failed: %@", error.description);
@@ -379,6 +401,32 @@
 
 -(void)videoFeed:(DJIVideoFeed *)videoFeed didUpdateVideoData:(NSData *)videoData {
     [[DJIVideoPreviewer instance] push:(uint8_t *)videoData.bytes length:(int)videoData.length];
+}
+
+- (BOOL)isNeedFitFrameWidth {
+    NSString* displayName = [DemoUtility fetchCamera].displayName;
+    if ([displayName isEqualToString:DJICameraDisplayNameMavic2ZoomCamera] ||
+        [displayName isEqualToString:DJICameraDisplayNameMavic2ProCamera]) {
+        return YES;
+    }
+    
+    return NO;
+}
+
+- (BOOL)parseDecodingAssistInfoWithBuffer:(uint8_t *)buffer length:(int)length assistInfo:(DJIDecodingAssistInfo *)assistInfo {
+    return [[DJISDKManager videoFeeder].primaryVideoFeed parseDecodingAssistInfoWithBuffer:buffer length:length assistInfo:(void *)assistInfo];
+}
+
+- (void)syncDecoderStatus:(BOOL)isNormal {
+    [[DJISDKManager videoFeeder].primaryVideoFeed syncDecoderStatus:isNormal];
+}
+
+- (void)decodingDidSucceedWithTimestamp:(uint32_t)timestamp {
+    [[DJISDKManager videoFeeder].primaryVideoFeed decodingDidSucceedWithTimestamp:(NSUInteger)timestamp];
+}
+
+- (void)decodingDidFail {
+    [[DJISDKManager videoFeeder].primaryVideoFeed decodingDidFail];
 }
 
 @end
