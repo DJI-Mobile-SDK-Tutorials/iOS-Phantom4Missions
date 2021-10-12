@@ -19,8 +19,8 @@ From this demo, you will learn how to use the TapFly and ActiveTrack Missions of
 - Phantom 4 Advanced
 - Inspire 2
 - M200
--Mavic 2 Pro
--Mavic 2 Zoom
+- Mavic 2 Pro
+- Mavic 2 Zoom
 
 ## SDK Installation with CocoaPods
 
